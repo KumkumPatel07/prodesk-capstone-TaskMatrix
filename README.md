@@ -167,7 +167,12 @@ Planned core screens:
 
 The interface will support responsive layouts for desktop, tablet, and mobile devices.
 
-**Figma Design:** Coming Soon.
+**Figma Design:** [View TaskMatrix UI/UX Designs](https://www.figma.com/design/Rr2wdHbwtkwzL8WCFn7X3W/TaskMatrix---UI-UX-Design?node-id=9-64&t=2BqaS2ngEkNfeJxs-1)
+
+The design includes:
+- Login Screen
+- Main Dashboard
+- Project Tasks / Kanban Board
 
 ## 12. Development Roadmap
 
