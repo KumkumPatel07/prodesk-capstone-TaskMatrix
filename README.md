@@ -144,6 +144,10 @@ The application will use MongoDB with five primary collections.
 
 Relationships will be maintained using MongoDB ObjectId references.
 
+### Entity Relationship Diagram (ERD)
+
+![TaskMatrix Database Architecture](docs/architecture/taskmatrix-er-diagram.png)
+
 ## 10. Application Modules
 
 * Authentication Module
