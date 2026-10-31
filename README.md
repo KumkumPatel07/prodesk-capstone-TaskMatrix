@@ -146,7 +146,7 @@ Relationships will be maintained using MongoDB ObjectId references.
 
 ### Entity Relationship Diagram (ERD)
 
-![TaskMatrix Database Architecture](docs/architecture/taskmatrix-er-diagram.png)
+![TaskMatrix Database Architecture](docs/architecture/TaskMatrix-Database Architecture.png)
 
 ## 10. Application Modules
 
