@@ -5,6 +5,8 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
+const authMiddleware = require("../middleware/authMiddleware");
+
 // Register API
 router.post("/register", async (req, res) => {
   try {
@@ -105,6 +107,31 @@ router.post("/login", async (req, res) => {
     res.status(500).json({
       message: "Login failed",
       error: error.message,
+    });
+  }
+});
+
+// Protected Profile API
+router.get("/me", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Could not fetch user",
     });
   }
 });
