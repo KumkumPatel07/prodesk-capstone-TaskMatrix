@@ -3,6 +3,9 @@ const dotenv = require("dotenv");
 const cors = require("cors");
 const connectDB = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
+const taskRoutes = require("./routes/taskRoutes");
+const workspaceRoutes = require("./routes/workspaceRoutes");
+const projectRoutes = require("./routes/projectRoutes");
 
 dotenv.config();
 
@@ -14,6 +17,10 @@ app.use(express.json());
 
 //Authentication Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/tasks", taskRoutes);
+app.use("/api/workspaces", workspaceRoutes);
+app.use("/api/projects", projectRoutes);
+
 
 // MongoDB connection
 connectDB();
