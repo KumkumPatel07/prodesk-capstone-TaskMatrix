@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import API from "@/lib/api";
+import axios from "axios";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,11 +35,13 @@ export default function LoginPage() {
       localStorage.setItem("user", JSON.stringify(response.data.user));
 
       router.push("/dashboard");
-    } catch (error: any) {
-      setMessage(
-        error.response?.data?.message || "Login failed"
-      );
-    } finally {
+    } catch (error: unknown) {
+  if (axios.isAxiosError<{ message?: string }>(error)) {
+    setMessage(error.response?.data?.message || "Login failed");
+  } else {
+    setMessage("Login failed");
+  }
+} finally {
       setLoading(false);
     }
   };
@@ -107,7 +110,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-6 text-center text-sm text-slate-400">
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <a href="/register" className="font-semibold text-blue-400 hover:underline">
             Register
           </a>

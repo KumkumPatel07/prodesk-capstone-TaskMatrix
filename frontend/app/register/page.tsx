@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import API from "@/lib/api";
+import axios from "axios";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -36,11 +37,13 @@ export default function RegisterPage() {
       setTimeout(() => {
         router.push("/login");
       }, 1000);
-    } catch (error: any) {
-      setMessage(
-        error.response?.data?.message || "Registration failed"
-      );
-    } finally {
+   } catch (error: unknown) {
+  if (axios.isAxiosError<{ message?: string }>(error)) {
+    setMessage(error.response?.data?.message || "Registration failed");
+  } else {
+    setMessage("Registration failed");
+  }
+}finally {
       setLoading(false);
     }
   };
