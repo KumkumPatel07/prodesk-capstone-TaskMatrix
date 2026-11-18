@@ -10,9 +10,15 @@ interface User {
   email: string;
 }
 
+interface Workspace {
+  _id: string;
+  name: string;
+}
+
 interface Project {
   _id: string;
   name: string;
+  workspaceId?: string;
 }
 
 interface Task {
@@ -37,11 +43,20 @@ const initialForm = {
 export default function DashboardPage() {
   const router = useRouter();
 
+  // STATES
   const [user, setUser] = useState<User | null>(null);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [selectedWorkspace, setSelectedWorkspace] = useState("");
+  const [projectName, setProjectName] = useState("");
+  const [projectDescription, setProjectDescription] = useState("");
+
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -57,6 +72,7 @@ export default function DashboardPage() {
     },
   };
 
+  // FETCH DASHBOARD DATA
   useEffect(() => {
     const fetchDashboard = async () => {
       const savedToken = localStorage.getItem("token");
@@ -76,13 +92,23 @@ export default function DashboardPage() {
         const profile = await API.get("/auth/me", authConfig);
         setUser(profile.data.user);
 
-        const [projectResponse, taskResponse] = await Promise.all([
+        const [
+          workspaceResponse,
+          projectResponse,
+          taskResponse,
+        ] = await Promise.all([
+          API.get("/workspaces", authConfig),
           API.get("/projects", authConfig),
           API.get("/tasks", authConfig),
         ]);
 
+        setWorkspaces(workspaceResponse.data);
         setProjects(projectResponse.data);
         setTasks(taskResponse.data);
+
+        if (workspaceResponse.data.length > 0) {
+          setSelectedWorkspace(workspaceResponse.data[0]._id);
+        }
 
         if (projectResponse.data.length > 0) {
           setForm((prev) => ({
@@ -101,13 +127,95 @@ export default function DashboardPage() {
     fetchDashboard();
   }, [router]);
 
+  // LOGOUT
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     router.replace("/login");
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  // CREATE WORKSPACE
+  const handleCreateWorkspace = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
+    e.preventDefault();
+    setError("");
+
+    if (!workspaceName.trim()) {
+      setError("Please enter a workspace name.");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const response = await API.post(
+        "/workspaces",
+        { name: workspaceName.trim() },
+        config
+      );
+
+      const newWorkspace = response.data.workspace;
+
+      setWorkspaces((prev) => [...prev, newWorkspace]);
+      setSelectedWorkspace(newWorkspace._id);
+      setWorkspaceName("");
+    } catch (err) {
+      console.error(err);
+      setError("Failed to create workspace. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // CREATE PROJECT
+  const handleCreateProject = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
+    e.preventDefault();
+    setError("");
+
+    if (!selectedWorkspace || !projectName.trim()) {
+      setError("Please select a workspace and enter a project name.");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const response = await API.post(
+        "/projects",
+        {
+          workspaceId: selectedWorkspace,
+          name: projectName.trim(),
+          description: projectDescription.trim(),
+        },
+        config
+      );
+
+      const newProject = response.data.project;
+
+      setProjects((prev) => [...prev, newProject]);
+
+      setForm((prev) => ({
+        ...prev,
+        projectId: newProject._id,
+      }));
+
+      setProjectName("");
+      setProjectDescription("");
+    } catch (err) {
+      console.error(err);
+      setError("Failed to create project. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // CREATE / UPDATE TASK
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
     e.preventDefault();
     setError("");
 
@@ -138,11 +246,17 @@ export default function DashboardPage() {
           )
         );
       } else {
-        const response = await API.post("/tasks", payload, config);
+        const response = await API.post(
+          "/tasks",
+          payload,
+          config
+        );
+
         setTasks((prev) => [response.data.task, ...prev]);
       }
 
       setEditingId(null);
+
       setForm({
         ...initialForm,
         projectId: projects[0]?._id || "",
@@ -155,6 +269,7 @@ export default function DashboardPage() {
     }
   };
 
+  // EDIT TASK
   const handleEdit = (task: Task) => {
     setEditingId(task._id);
 
@@ -169,9 +284,13 @@ export default function DashboardPage() {
         : "",
     });
 
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   };
 
+  // DELETE TASK
   const handleDelete = async (id: string) => {
     if (!window.confirm("Are you sure you want to delete this task?")) {
       return;
@@ -179,7 +298,6 @@ export default function DashboardPage() {
 
     const previousTasks = tasks;
 
-    // Optimistic UI update
     setTasks((prev) => prev.filter((task) => task._id !== id));
     setError("");
 
@@ -192,14 +310,17 @@ export default function DashboardPage() {
     }
   };
 
+  // CANCEL EDIT
   const cancelEdit = () => {
     setEditingId(null);
+
     setForm({
       ...initialForm,
       projectId: projects[0]?._id || "",
     });
   };
 
+  // LOADING
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-950 text-white">
@@ -231,7 +352,7 @@ export default function DashboardPage() {
         </h2>
 
         <p className="mt-2 text-slate-400">
-          Manage your projects and tasks from one place.
+          Manage your workspaces, projects and tasks from one place.
         </p>
 
         {error && (
@@ -240,6 +361,7 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* DASHBOARD STATISTICS */}
         <div className="mt-8 grid gap-5 md:grid-cols-3">
           <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
             <p className="text-sm text-slate-400">My Projects</p>
@@ -263,6 +385,116 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* CREATE WORKSPACE */}
+        <div className="mt-10 rounded-xl border border-slate-800 bg-slate-900 p-6">
+          <h3 className="mb-5 text-xl font-bold">
+            Create New Workspace
+          </h3>
+
+          <form
+            onSubmit={handleCreateWorkspace}
+            className="flex flex-col gap-4 sm:flex-row"
+          >
+            <input
+              required
+              value={workspaceName}
+              onChange={(e) => setWorkspaceName(e.target.value)}
+              placeholder="Enter workspace name"
+              className="flex-1 rounded-lg border border-slate-700 bg-slate-950 p-3"
+            />
+
+            <button
+              type="submit"
+              disabled={saving}
+              className="rounded-lg bg-blue-600 px-6 py-3 font-semibold hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? "Creating..." : "Create Workspace"}
+            </button>
+          </form>
+        </div>
+
+        {/* CREATE PROJECT */}
+        <div className="mt-6 rounded-xl border border-slate-800 bg-slate-900 p-6">
+          <h3 className="mb-5 text-xl font-bold">
+            Create New Project
+          </h3>
+
+          {workspaces.length === 0 ? (
+            <p className="text-amber-300">
+              Create a workspace first before creating a project.
+            </p>
+          ) : (
+            <form
+              onSubmit={handleCreateProject}
+              className="grid gap-5 md:grid-cols-2"
+            >
+              <div className="md:col-span-2">
+                <label className="mb-2 block text-sm text-slate-300">
+                  Select Workspace
+                </label>
+
+                <select
+                  required
+                  value={selectedWorkspace}
+                  onChange={(e) =>
+                    setSelectedWorkspace(e.target.value)
+                  }
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 p-3"
+                >
+                  {workspaces.map((workspace) => (
+                    <option
+                      key={workspace._id}
+                      value={workspace._id}
+                    >
+                      {workspace.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-slate-300">
+                  Project Name
+                </label>
+
+                <input
+                  required
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  placeholder="Enter project name"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 p-3"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-slate-300">
+                  Project Description
+                </label>
+
+                <input
+                  value={projectDescription}
+                  onChange={(e) =>
+                    setProjectDescription(e.target.value)
+                  }
+                  placeholder="Enter project description"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 p-3"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="rounded-lg bg-blue-600 px-6 py-3 font-semibold hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {saving ? "Creating..." : "Create Project"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+
+        {/* CREATE / UPDATE TASK */}
         <div className="mt-10 rounded-xl border border-slate-800 bg-slate-900 p-6">
           <h3 className="mb-6 text-xl font-bold">
             {editingId ? "Update Task" : "Create New Task"}
@@ -273,7 +505,10 @@ export default function DashboardPage() {
               No projects found. Create a project before adding tasks.
             </p>
           ) : (
-            <form onSubmit={handleSubmit} className="grid gap-5 md:grid-cols-2">
+            <form
+              onSubmit={handleSubmit}
+              className="grid gap-5 md:grid-cols-2"
+            >
               <div>
                 <label className="mb-2 block text-sm text-slate-300">
                   Select Project
@@ -282,7 +517,10 @@ export default function DashboardPage() {
                 <select
                   value={form.projectId}
                   onChange={(e) =>
-                    setForm({ ...form, projectId: e.target.value })
+                    setForm({
+                      ...form,
+                      projectId: e.target.value,
+                    })
                   }
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 p-3"
                 >
@@ -303,7 +541,10 @@ export default function DashboardPage() {
                   required
                   value={form.title}
                   onChange={(e) =>
-                    setForm({ ...form, title: e.target.value })
+                    setForm({
+                      ...form,
+                      title: e.target.value,
+                    })
                   }
                   placeholder="Enter task title"
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 p-3"
@@ -318,7 +559,10 @@ export default function DashboardPage() {
                 <textarea
                   value={form.description}
                   onChange={(e) =>
-                    setForm({ ...form, description: e.target.value })
+                    setForm({
+                      ...form,
+                      description: e.target.value,
+                    })
                   }
                   placeholder="Describe your task"
                   rows={3}
@@ -334,7 +578,10 @@ export default function DashboardPage() {
                 <select
                   value={form.status}
                   onChange={(e) =>
-                    setForm({ ...form, status: e.target.value })
+                    setForm({
+                      ...form,
+                      status: e.target.value,
+                    })
                   }
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 p-3"
                 >
@@ -352,7 +599,10 @@ export default function DashboardPage() {
                 <select
                   value={form.priority}
                   onChange={(e) =>
-                    setForm({ ...form, priority: e.target.value })
+                    setForm({
+                      ...form,
+                      priority: e.target.value,
+                    })
                   }
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 p-3"
                 >
@@ -371,7 +621,10 @@ export default function DashboardPage() {
                   type="date"
                   value={form.dueDate}
                   onChange={(e) =>
-                    setForm({ ...form, dueDate: e.target.value })
+                    setForm({
+                      ...form,
+                      dueDate: e.target.value,
+                    })
                   }
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 p-3"
                 />
@@ -404,8 +657,11 @@ export default function DashboardPage() {
           )}
         </div>
 
+        {/* MY TASKS */}
         <div className="mt-10">
-          <h3 className="mb-5 text-2xl font-bold">My Tasks</h3>
+          <h3 className="mb-5 text-2xl font-bold">
+            My Tasks
+          </h3>
 
           {tasks.length === 0 ? (
             <div className="rounded-xl border border-slate-800 bg-slate-900 p-8 text-center text-slate-400">
@@ -419,7 +675,9 @@ export default function DashboardPage() {
                   className="rounded-xl border border-slate-800 bg-slate-900 p-6"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <h4 className="text-lg font-bold">{task.title}</h4>
+                    <h4 className="text-lg font-bold">
+                      {task.title}
+                    </h4>
 
                     <span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs text-blue-300">
                       {task.priority}
@@ -469,10 +727,17 @@ export default function DashboardPage() {
           )}
         </div>
 
+        {/* ACCOUNT DETAILS */}
         <div className="mt-8 rounded-xl border border-slate-800 bg-slate-900 p-6">
           <h3 className="font-semibold">Account Details</h3>
-          <p className="mt-3 text-slate-300">Name: {user.name}</p>
-          <p className="mt-2 text-slate-300">Email: {user.email}</p>
+
+          <p className="mt-3 text-slate-300">
+            Name: {user.name}
+          </p>
+
+          <p className="mt-2 text-slate-300">
+            Email: {user.email}
+          </p>
         </div>
       </section>
     </main>
